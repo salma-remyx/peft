@@ -46,15 +46,17 @@ benchmarks:
     held_constant:
       - the harness, dataset and default training params committed in this repo
       - meta-llama/Llama-3.2-3B at bfloat16, 5000 steps, seed 0
-    compute:
-      tier: gpu
-      # `auto` so the budget comes from the corpus estimate. Padding is well
-      # above the default because the corpus was measured on the maintainers'
-      # hardware and this runs on an L40S.
-      timeout_s: auto
-      timeout_padding: 4
-      timeout_max_s: 21600
     provenance:
       suite: repo_harness
       baseline: results_corpus
       test_accuracy: repo_harness
+
+# Top level: the deployed engine reads compute from here.
+compute:
+  tier: gpu
+  # `auto` so the budget comes from the corpus estimate; padding well
+  # above default because the corpus was measured on the maintainers'
+  # hardware and this runs on an L40S.
+  timeout_s: auto
+  timeout_padding: 4
+  timeout_max_s: 21600
