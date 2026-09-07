@@ -57,9 +57,6 @@ compute:
   # `auto` so the budget comes from the corpus estimate; padding well
   # above default because the corpus was measured on the maintainers'
   # hardware and this runs on an L40S.
-  # Pinned to the number `auto` resolves to from the corpus (1485s x 4).
-  # `auto` itself 500s on the currently deployed engine; fixed on the branch,
-  # so this is pinned only to let the GPU run proceed before that ships.
-  timeout_s: 5940
+  timeout_s: auto
   timeout_padding: 4
   timeout_max_s: 21600
