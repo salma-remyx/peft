@@ -1,0 +1,60 @@
+# Validate: measure a rank-16 LoRA against the rank-32 row peft already publishes.
+#
+# The suite is the repo's OWN harness — run.py over the experiment this PR adds —
+# because a synthesized stand-in is not comparable to the published table. The
+# baseline is the committed results corpus rather than a second arm: the baseline
+# commit has no rank-16 experiment to run, so there is nothing for that arm to do.
+benchmarks:
+  - name: lora-rank16
+    suite:
+      harness:
+        runner: method_comparison/MetaMathQA/run.py
+        # Relative to the harness's own directory, which is where it is invoked
+        # from: peft requires exactly experiments/<method>/<name>.
+        experiments: experiments/lora/llama-3.2-3B-rank16
+        # Repo-relative: read from GitHub for the baseline + the runtime
+        # estimate, and globbed in the checkout for what this run writes.
+        results_glob: method_comparison/MetaMathQA/results/*.json
+        # Which corpus rows are comparable. Without this the estimate spans
+        # BOFT at 161.7 min and LoRA at 19.2 min and describes neither.
+        method: lora
+    scorer: test_accuracy
+    baseline:
+      source: method_comparison/MetaMathQA/results/lora--llama-3.2-3B-rank32.json
+      values:
+        test_accuracy: 0.4783927217589083
+        train_time: 941.9589897260084
+        accelerator_memory_max: 22292725760
+    metrics:
+      # rank 32 scores 0.4784. Half the rank should stay in reach of it;
+      # 0.40 is a real bound rather than a vacuous one.
+      - name: test_accuracy
+        direction: max
+        threshold: 0.40
+        role: target
+      # Measured and shown on the tradeoff, never gating — the point of a
+      # smaller rank is fewer parameters and less memory.
+      - name: train_time
+        direction: min
+        role: cost
+      - name: accelerator_memory_max
+        direction: min
+        role: cost
+      - name: num_trainable_params
+        direction: min
+        role: cost
+    held_constant:
+      - the harness, dataset and default training params committed in this repo
+      - meta-llama/Llama-3.2-3B at bfloat16, 5000 steps, seed 0
+    compute:
+      tier: gpu
+      # `auto` so the budget comes from the corpus estimate. Padding is well
+      # above the default because the corpus was measured on the maintainers'
+      # hardware and this runs on an L40S.
+      timeout_s: auto
+      timeout_padding: 4
+      timeout_max_s: 21600
+    provenance:
+      suite: repo_harness
+      baseline: results_corpus
+      test_accuracy: repo_harness
