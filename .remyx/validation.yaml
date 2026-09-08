@@ -14,7 +14,19 @@ benchmarks:
         experiments: experiments/lora/llama-3.2-3B-rank16
         # Repo-relative: read from GitHub for the baseline + the runtime
         # estimate, and globbed in the checkout for what this run writes.
-        results_glob: method_comparison/MetaMathQA/results/*.json
+        #
+        # Both locations, because peft chooses between them at runtime:
+        #
+        #     elif peft_branch != "main":
+        #         save_dir = RESULT_PATH_TEST      # temporary_results/
+        #
+        # and `peft_branch` is `git rev-parse --abbrev-ref HEAD`. A validation
+        # runs at a detached commit, so that reads "HEAD" and peft files the
+        # run as a test run. Watching only results/ measured a full training
+        # run and reported nothing.
+        results_glob: >-
+          method_comparison/MetaMathQA/results/*.json,
+          method_comparison/MetaMathQA/temporary_results/*.json
         # Which corpus rows are comparable. Without this the estimate spans
         # BOFT at 161.7 min and LoRA at 19.2 min and describes neither.
         method: lora
