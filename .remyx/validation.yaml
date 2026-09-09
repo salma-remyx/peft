@@ -40,9 +40,20 @@ benchmarks:
         # truncated image is never reused.
         smoke_params_path: method_comparison/MetaMathQA/default_training_params.json
         smoke_overrides:
-          max_steps: 4
+          # Two steps, and only the final eval.
+          max_steps: 2
           eval_steps: 2
-          batch_size_eval: 4
+          # The eval set is a fixed ~1350 examples, so the cost is GENERATION
+          # LENGTH, not step count. 300 new tokens per example at 27 batches
+          # was 11 minutes; 16 tokens is the lever that actually shortens it.
+          #
+          # batch_size_eval is deliberately NOT lowered. Dropping it 50 -> 4
+          # turned 27 eval batches into 338 and made the smoke run SLOWER than
+          # the thing it stands in for — generation is latency-bound per token,
+          # so smaller batches buy nothing and cost 12.5x the batches.
+          generation_kwargs:
+            max_length: 64
+            max_new_tokens: 16
     scorer: test_accuracy
     baseline:
       source: method_comparison/MetaMathQA/results/lora--llama-3.2-3B-rank32.json
