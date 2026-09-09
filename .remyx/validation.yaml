@@ -30,6 +30,19 @@ benchmarks:
         # Which corpus rows are comparable. Without this the estimate spans
         # BOFT at 161.7 min and LoRA at 19.2 min and describes neither.
         method: lora
+        # Smoke mode: exercise the whole pipeline in minutes instead of an
+        # hour. Four steps rather than 5000, patched into the params file the
+        # harness actually reads — peft has no CLI override for max_steps.
+        #
+        # A smoke run MEASURES NOTHING and the engine forces `no-signal` for
+        # it: four steps cannot answer whether rank 16 holds 0.40. Comment the
+        # overrides out for the real run; that changes `spec_hash`, so the
+        # truncated image is never reused.
+        smoke_params_path: method_comparison/MetaMathQA/default_training_params.json
+        smoke_overrides:
+          max_steps: 4
+          eval_steps: 2
+          batch_size_eval: 4
     scorer: test_accuracy
     baseline:
       source: method_comparison/MetaMathQA/results/lora--llama-3.2-3B-rank32.json
