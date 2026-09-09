@@ -24,9 +24,19 @@ benchmarks:
         # runs at a detached commit, so that reads "HEAD" and peft files the
         # run as a test run. Watching only results/ measured a full training
         # run and reported nothing.
+        # All three, because peft picks between them at RUNTIME:
+        #   results/            - branch is "main" and training succeeded
+        #   temporary_results/  - any other branch, which a detached
+        #                         validation checkout always is
+        #   cancelled_results/  - an exception was caught. peft wraps train
+        #                         and eval in `except Exception -> CANCELED`
+        #                         and still exits 0, so without this a failed
+        #                         eval is indistinguishable from a silent one.
+        #                         The document it writes carries `error_msg`.
         results_glob: >-
           method_comparison/MetaMathQA/results/*.json,
-          method_comparison/MetaMathQA/temporary_results/*.json
+          method_comparison/MetaMathQA/temporary_results/*.json,
+          method_comparison/MetaMathQA/cancelled_results/*.json
         # Which corpus rows are comparable. Without this the estimate spans
         # BOFT at 161.7 min and LoRA at 19.2 min and describes neither.
         method: lora
@@ -51,8 +61,13 @@ benchmarks:
           # turned 27 eval batches into 338 and made the smoke run SLOWER than
           # the thing it stands in for — generation is latency-bound per token,
           # so smaller batches buy nothing and cost 12.5x the batches.
+          # Only max_new_tokens. max_length is a CEILING on prompt+output,
+          # and peft computes min(max_new_tokens + seq_len, max_length): at 64
+          # that landed under the prompt length, generation raised, and peft's
+          # catch-all filed the run as cancelled. Leaving it at the default
+          # 800 lets the 16-token cap do the work.
           generation_kwargs:
-            max_length: 64
+            max_length: 800
             max_new_tokens: 16
     scorer: test_accuracy
     baseline:
