@@ -40,6 +40,11 @@ benchmarks:
         # Which corpus rows are comparable. Without this the estimate spans
         # BOFT at 161.7 min and LoRA at 19.2 min and describes neither.
         method: lora
+        # Smoke mode (OFF — this is the real measurement). Uncomment the
+        # two keys below to exercise the pipeline in minutes instead; that
+        # changes `spec_hash`, so the truncated image is never reused for
+        # a full run and vice versa.
+        #
         # Smoke mode: exercise the whole pipeline in minutes instead of an
         # hour. Four steps rather than 5000, patched into the params file the
         # harness actually reads — peft has no CLI override for max_steps.
@@ -48,11 +53,11 @@ benchmarks:
         # it: four steps cannot answer whether rank 16 holds 0.40. Comment the
         # overrides out for the real run; that changes `spec_hash`, so the
         # truncated image is never reused.
-        smoke_params_path: method_comparison/MetaMathQA/default_training_params.json
-        smoke_overrides:
+        # smoke_params_path: method_comparison/MetaMathQA/default_training_params.json
+        # smoke_overrides:
           # Two steps, and only the final eval.
-          max_steps: 2
-          eval_steps: 2
+          # max_steps: 2
+          # eval_steps: 2
           # The eval set is a fixed ~1350 examples, so the cost is GENERATION
           # LENGTH, not step count. 300 new tokens per example at 27 batches
           # was 11 minutes; 16 tokens is the lever that actually shortens it.
@@ -66,9 +71,9 @@ benchmarks:
           # that landed under the prompt length, generation raised, and peft's
           # catch-all filed the run as cancelled. Leaving it at the default
           # 800 lets the 16-token cap do the work.
-          generation_kwargs:
-            max_length: 800
-            max_new_tokens: 16
+          # generation_kwargs:
+            # max_length: 800
+            # max_new_tokens: 16
     scorer: test_accuracy
     baseline:
       source: method_comparison/MetaMathQA/results/lora--llama-3.2-3B-rank32.json
