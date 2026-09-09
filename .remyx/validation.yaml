@@ -1,0 +1,118 @@
+# Validate: measure a rank-16 LoRA against the rank-32 row peft already publishes.
+#
+# The suite is the repo's OWN harness — run.py over the experiment this PR adds —
+# because a synthesized stand-in is not comparable to the published table. The
+# baseline is the committed results corpus rather than a second arm: the baseline
+# commit has no rank-16 experiment to run, so there is nothing for that arm to do.
+benchmarks:
+  - name: lora-rank16
+    suite:
+      harness:
+        runner: method_comparison/MetaMathQA/run.py
+        # Relative to the harness's own directory, which is where it is invoked
+        # from: peft requires exactly experiments/<method>/<name>.
+        experiments: experiments/lora/llama-3.2-3B-rank16
+        # Repo-relative: read from GitHub for the baseline + the runtime
+        # estimate, and globbed in the checkout for what this run writes.
+        #
+        # Both locations, because peft chooses between them at runtime:
+        #
+        #     elif peft_branch != "main":
+        #         save_dir = RESULT_PATH_TEST      # temporary_results/
+        #
+        # and `peft_branch` is `git rev-parse --abbrev-ref HEAD`. A validation
+        # runs at a detached commit, so that reads "HEAD" and peft files the
+        # run as a test run. Watching only results/ measured a full training
+        # run and reported nothing.
+        # All three, because peft picks between them at RUNTIME:
+        #   results/            - branch is "main" and training succeeded
+        #   temporary_results/  - any other branch, which a detached
+        #                         validation checkout always is
+        #   cancelled_results/  - an exception was caught. peft wraps train
+        #                         and eval in `except Exception -> CANCELED`
+        #                         and still exits 0, so without this a failed
+        #                         eval is indistinguishable from a silent one.
+        #                         The document it writes carries `error_msg`.
+        results_glob: >-
+          method_comparison/MetaMathQA/results/*.json,
+          method_comparison/MetaMathQA/temporary_results/*.json,
+          method_comparison/MetaMathQA/cancelled_results/*.json
+        # Which corpus rows are comparable. Without this the estimate spans
+        # BOFT at 161.7 min and LoRA at 19.2 min and describes neither.
+        method: lora
+        # Smoke mode (OFF — this is the real measurement). Uncomment the
+        # two keys below to exercise the pipeline in minutes instead; that
+        # changes `spec_hash`, so the truncated image is never reused for
+        # a full run and vice versa.
+        #
+        # Smoke mode: exercise the whole pipeline in minutes instead of an
+        # hour. Four steps rather than 5000, patched into the params file the
+        # harness actually reads — peft has no CLI override for max_steps.
+        #
+        # A smoke run MEASURES NOTHING and the engine forces `no-signal` for
+        # it: four steps cannot answer whether rank 16 holds 0.40. Comment the
+        # overrides out for the real run; that changes `spec_hash`, so the
+        # truncated image is never reused.
+        # smoke_params_path: method_comparison/MetaMathQA/default_training_params.json
+        # smoke_overrides:
+          # Two steps, and only the final eval.
+          # max_steps: 2
+          # eval_steps: 2
+          # The eval set is a fixed ~1350 examples, so the cost is GENERATION
+          # LENGTH, not step count. 300 new tokens per example at 27 batches
+          # was 11 minutes; 16 tokens is the lever that actually shortens it.
+          #
+          # batch_size_eval is deliberately NOT lowered. Dropping it 50 -> 4
+          # turned 27 eval batches into 338 and made the smoke run SLOWER than
+          # the thing it stands in for — generation is latency-bound per token,
+          # so smaller batches buy nothing and cost 12.5x the batches.
+          # Only max_new_tokens. max_length is a CEILING on prompt+output,
+          # and peft computes min(max_new_tokens + seq_len, max_length): at 64
+          # that landed under the prompt length, generation raised, and peft's
+          # catch-all filed the run as cancelled. Leaving it at the default
+          # 800 lets the 16-token cap do the work.
+          # generation_kwargs:
+            # max_length: 800
+            # max_new_tokens: 16
+    scorer: test_accuracy
+    baseline:
+      source: method_comparison/MetaMathQA/results/lora--llama-3.2-3B-rank32.json
+      values:
+        test_accuracy: 0.4783927217589083
+        train_time: 941.9589897260084
+        accelerator_memory_max: 22292725760
+    metrics:
+      # rank 32 scores 0.4784. Half the rank should stay in reach of it;
+      # 0.40 is a real bound rather than a vacuous one.
+      - name: test_accuracy
+        direction: max
+        threshold: 0.40
+        role: target
+      # Measured and shown on the tradeoff, never gating — the point of a
+      # smaller rank is fewer parameters and less memory.
+      - name: train_time
+        direction: min
+        role: cost
+      - name: accelerator_memory_max
+        direction: min
+        role: cost
+      - name: num_trainable_params
+        direction: min
+        role: cost
+    held_constant:
+      - the harness, dataset and default training params committed in this repo
+      - meta-llama/Llama-3.2-3B at bfloat16, 5000 steps, seed 0
+    provenance:
+      suite: repo_harness
+      baseline: results_corpus
+      test_accuracy: repo_harness
+
+# Top level: the deployed engine reads compute from here.
+compute:
+  tier: gpu
+  # `auto` so the budget comes from the corpus estimate; padding well
+  # above default because the corpus was measured on the maintainers'
+  # hardware and this runs on an L40S.
+  timeout_s: auto
+  timeout_padding: 4
+  timeout_max_s: 21600
